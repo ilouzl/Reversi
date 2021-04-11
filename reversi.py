@@ -2,6 +2,7 @@ import math
 import gym
 from gym import spaces, logger
 import numpy as np
+from keyboard import get_key
 
 class Reversi(gym.Env):
     """
@@ -147,15 +148,41 @@ class Reversi(gym.Env):
     def _idx2coordinate(self, idx):
         return np.unravel_index(idx, (self.N, self.N))
 
-    def play(self):
-        uinput = input("It's %s turn. What's your next move? [like 'B3'] : "%(self.board_symbols[self.cur_player]))
-        try:
-            row = ord(uinput[0].upper()) - ord('A')
-            col = int(uinput[1:]) - 1
-            assert self._is_in_board((row, col)), "Coordinate outside the board"
-        except Exception as e:
-            print(e)
-            return
+    def play(self, interactive=False):
+        if interactive:
+            coord = (0,0)
+            st = np.array(self.state)
+            d = [0,0]
+            while True:
+                new_coord = tuple(np.asanyarray(coord) + d)
+                if self._is_in_board(new_coord) and self.state[new_coord] == 0:
+                    st[coord] = self.state[coord]
+                    coord = new_coord
+                    st[coord] = 2
+                print("It's %s turn. What's your next move? [user arrow keys'] : "%(self.board_symbols[self.cur_player]))
+                self.render(state = st)
+                k = get_key()
+                if k == "UP":
+                    d = [-1,0]
+                elif k == "DOWN":
+                    d = [1,0]
+                elif k == "LEFT":
+                    d = [0,-1]
+                elif k == "RIGHT":
+                    d = [0,1]
+                elif k == "ENTER":
+                    break
+
+            row, col = coord
+        else:                
+            uinput = input("It's %s turn. What's your next move? [like 'B3'] : "%(self.board_symbols[self.cur_player]))
+            try:
+                row = ord(uinput[0].upper()) - ord('A')
+                col = int(uinput[1:]) - 1
+                assert self._is_in_board((row, col)), "Coordinate outside the board"
+            except Exception as e:
+                print(e)
+                return
         action = self._coordinate2idx((row,col))
         return self.step(action)
 
@@ -186,7 +213,7 @@ class Reversi(gym.Env):
 game = Reversi(6)
 game.render()
 while True:
-    game.play()
+    game.play(interactive=True)
 game.step(9)
 state = np.random.choice(3,36).reshape(-1,6).astype(int) -1
 game.render(state=state)
