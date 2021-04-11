@@ -37,6 +37,7 @@ class Reversi(gym.Env):
 
     def __init__(self, N=6):
         assert N % 2 == 0, "N has to be even"
+        assert N >= 4, "N has to be larger than 3"
         self.N = N
         self.action_space = spaces.Discrete(self.N**2)
         self.viewer = None
@@ -118,9 +119,9 @@ class Reversi(gym.Env):
         self.cur_player *= -1
         done = bool((self.state != 0).all())
 
+        sum1 = (self.state == -1).sum()
+        sum2 = (self.state == 1).sum()
         if not done:
-            sum1 = (self.state == -1).sum()
-            sum2 = (self.state == 1).sum()
             reward = sum2 - sum1
         elif sum2 > sum1:
             # Pole just fell!
@@ -150,16 +151,19 @@ class Reversi(gym.Env):
 
     def play(self, interactive=False):
         if interactive:
-            coord = (0,0)
-            st = np.array(self.state)
+            coord = tuple(np.argwhere(self.state == 0)[0])
             d = [0,0]
             while True:
                 new_coord = tuple(np.asanyarray(coord) + d)
-                if self._is_in_board(new_coord) and self.state[new_coord] == 0:
-                    st[coord] = self.state[coord]
-                    coord = new_coord
-                    st[coord] = 2
-                print("It's %s turn. What's your next move? [user arrow keys'] : "%(self.board_symbols[self.cur_player]))
+                if self._is_in_board(new_coord):
+                    if not self.state[new_coord] == 0:
+                        coord = new_coord
+                        continue
+                    else:
+                        coord = new_coord
+                        st = np.array(self.state)
+                        st[coord] = 2
+                print("It's %s turn. What's your next move? [use arrow keys] : "%(self.board_symbols[self.cur_player]))
                 self.render(state = st)
                 k = get_key()
                 if k == "UP":
@@ -210,10 +214,10 @@ class Reversi(gym.Env):
             return "\n".join(render)
 
 
-game = Reversi(6)
+game = Reversi(4)
 game.render()
+done = False
 while True:
-    game.play(interactive=True)
-game.step(9)
-state = np.random.choice(3,36).reshape(-1,6).astype(int) -1
-game.render(state=state)
+    state, reward, done, _ = game.play(interactive=True)
+    print("Reward is %d"%(reward))
+    if done: break
