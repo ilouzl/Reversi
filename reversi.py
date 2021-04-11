@@ -43,7 +43,7 @@ class Reversi(gym.Env):
     def __init__(self, N=6):
         assert N % 2 == 0, "N has to be even"
         self.N = N
-        self.action_space = spaces.Discrete(self.N^2)
+        self.action_space = spaces.Discrete(self.N**2)
         self.viewer = None
         self.state = None
         self.cur_player = None
@@ -54,7 +54,7 @@ class Reversi(gym.Env):
     def _is_legal_action(self, action):
         if not self.action_space.contains(action):
             return False
-        if self.state.flatten()[action] != 0:
+        if self.state.reshape(-1)[action] != 0:
             return False
         action_coordinates = np.unravel_index(action, (self.N, self.N))
         if not self._has_occupied_neighbours(action_coordinates):
@@ -74,7 +74,7 @@ class Reversi(gym.Env):
     def step(self, action):
         assert self._is_legal_action(action), "Illegal action"
         action_coordinates = np.unravel_index(action, (self.N, self.N))
-        self.state.flatten[action] = self.cur_player
+        self.state.reshape(-1)[action] = self.cur_player
         self.cur_player *= -1
 
 
@@ -91,6 +91,7 @@ class Reversi(gym.Env):
         else:
             reward = -1000.0
 
+        self.render()
         return np.asanyarray(self.state), reward, done, {}
 
     def reset(self):
@@ -132,5 +133,6 @@ class Reversi(gym.Env):
 
 
 game = Reversi(6)
+game.step(9)
 game.state = np.random.choice(3,36).reshape(-1,6).astype(int) -1
 game.render()
