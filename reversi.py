@@ -3,12 +3,6 @@ import gym
 from gym import spaces, logger
 import numpy as np
 
-class Cell(object):
-    def __init__(self, idx, N):
-        self.N = N
-        self.idx = idx
-        self.coordinate = np.unravel_index(action, (self.N, self.N))
-
 class Reversi(gym.Env):
     """
     Description:
@@ -48,15 +42,20 @@ class Reversi(gym.Env):
         self.state = None
         self.cur_player = None
         self.steps_beyond_done = None
+        self.board_symbols = {-1: "x", 0:" ", 1:"o", 2:"?"}
         self.neighbours = np.array(np.meshgrid([-1,0,1],[-1,0,1])).T.reshape(-1,2)
+        self.neighbours = self.neighbours[(self.neighbours != 0).any(axis=1)]
         self.reset()
+
+    def _is_in_board(self, coordinate):
+        return all([0 <= v <= (self.N-1) for v in coordinate])
 
     def _is_legal_action(self, action):
         if not self.action_space.contains(action):
             return False
         if self.state.reshape(-1)[action] != 0:
             return False
-        action_coordinates = np.unravel_index(action, (self.N, self.N))
+        action_coordinates = self._idx2coordinate(action)
         if not self._has_occupied_neighbours(action_coordinates):
             return False
 
@@ -72,12 +71,50 @@ class Reversi(gym.Env):
         return False
 
     def step(self, action):
-        assert self._is_legal_action(action), "Illegal action"
-        action_coordinates = np.unravel_index(action, (self.N, self.N))
+        if not self._is_legal_action(action):
+            print("Illegal action")
+            return False
+        action_coordinates = self._idx2coordinate(action)
         self.state.reshape(-1)[action] = self.cur_player
+        
+        # flip oponent pieces
+        opponent = self.cur_player * -1
+        accumulated_flip_coords = []
+        for d in self.neighbours:
+            coord = np.array(action_coordinates)
+            flip_coords = []
+            potential_flip = False
+            verified_flip = False
+            while True:
+                coord = tuple(np.asanyarray(coord) + d)
+                if self._is_in_board(coord):
+                    cell_value = self.state[tuple(coord)]
+                    if not potential_flip:
+                        if self.state[coord] == opponent:
+                            potential_flip = True
+                            flip_coords.append(coord)
+                        else:
+                            break     
+                    else:
+                        if self.state[coord] == opponent:
+                            flip_coords.append(coord)
+                        elif self.state[coord] == self.cur_player:
+                            verified_flip = True
+                            break
+                        else:
+                            break
+                else:
+                    break
+            if verified_flip:
+                accumulated_flip_coords.extend(flip_coords)
+        
+        for c in accumulated_flip_coords:
+            self.state[c] = self.cur_player
+
+
+        
+        
         self.cur_player *= -1
-
-
         done = bool((self.state != 0).all())
 
         if not done:
@@ -104,8 +141,27 @@ class Reversi(gym.Env):
         self.steps_beyond_done = None
         self.cur_player = 1 if np.random.choice(2) == 1 else -1
 
-    def render(self, mode='human'):
-        symbols = ["x", " ", "o"]
+    def _coordinate2idx(self, coordinate):
+        return np.ravel_multi_index(coordinate, (self.N,self.N))
+
+    def _idx2coordinate(self, idx):
+        return np.unravel_index(idx, (self.N, self.N))
+
+    def play(self):
+        uinput = input("It's %s turn. What's your next move? [like 'B3'] : "%(self.board_symbols[self.cur_player]))
+        try:
+            row = ord(uinput[0].upper()) - ord('A')
+            col = int(uinput[1:]) - 1
+            assert self._is_in_board((row, col)), "Coordinate outside the board"
+        except Exception as e:
+            print(e)
+            return
+        action = self._coordinate2idx((row,col))
+        return self.step(action)
+
+    def render(self, mode='human', state=None):
+        if state is None:
+            state = self.state
         render = []
         columns = " "*3 + " ".join([str(i+1) for i in range(self.N)])
         render.append(columns)
@@ -114,7 +170,7 @@ class Reversi(gym.Env):
 
         for row in range(self.N):
             line = chr(65+row) + " |"
-            line += "|".join([symbols[c+1] for c in self.state[row]]) + "|"
+            line += "|".join([self.board_symbols[c] for c in state[row]]) + "|"
             render.append(line)
         
         render.append(separator)
@@ -126,13 +182,11 @@ class Reversi(gym.Env):
         if mode == 'ansi':
             return "\n".join(render)
 
-    def close(self):
-        if self.viewer:
-            self.viewer.close()
-            self.viewer = None
-
 
 game = Reversi(6)
-game.step(9)
-game.state = np.random.choice(3,36).reshape(-1,6).astype(int) -1
 game.render()
+while True:
+    game.play()
+game.step(9)
+state = np.random.choice(3,36).reshape(-1,6).astype(int) -1
+game.render(state=state)
